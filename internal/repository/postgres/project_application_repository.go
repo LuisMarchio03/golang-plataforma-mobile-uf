@@ -24,7 +24,41 @@ func (r *projectApplicationRepository) FindByStatus(ctx context.Context, status 
 
 // FindByUser implements repository.ProjectApplicationRepository.
 func (r *projectApplicationRepository) FindByUser(ctx context.Context, userID string) ([]repository.ProjectApplication, error) {
-	panic("unimplemented")
+	query := `
+        SELECT id, project_id, user_id, message, status, created_at, updated_at
+        FROM project_applications
+        WHERE user_id = $1
+    `
+
+	rows, err := r.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao buscar candidaturas do usuário: %v", err)
+	}
+	defer rows.Close()
+
+	var applications []repository.ProjectApplication
+	for rows.Next() {
+		var app repository.ProjectApplication
+		err := rows.Scan(
+			&app.ID,
+			&app.ProjectID,
+			&app.UserID,
+			&app.Message,
+			&app.Status,
+			&app.CreatedAt,
+			&app.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("erro ao ler candidatura: %v", err)
+		}
+		applications = append(applications, app)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("erro ao iterar candidaturas: %v", err)
+	}
+
+	return applications, nil
 }
 
 // List implements repository.ProjectApplicationRepository.

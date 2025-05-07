@@ -1,74 +1,115 @@
 package handler
 
 import (
-	"github.com/LuisMarchio03/golang-plataforma-mobile-uf/internal/usecase/project_application"
+	"github.com/LuisMarchio03/golang-plataforma-mobile-uf/internal/repository"
+	usecase "github.com/LuisMarchio03/golang-plataforma-mobile-uf/internal/usecase/project_application"
 	"github.com/gofiber/fiber/v2"
 )
 
 type ProjectApplicationHandler struct {
-	applicationUseCase usecase.ProjectApplicationUseCase
+	useCase usecase.ProjectApplicationUseCase
 }
 
-func NewProjectApplicationHandler(applicationUseCase usecase.ProjectApplicationUseCase) *ProjectApplicationHandler {
+func NewProjectApplicationHandler(useCase usecase.ProjectApplicationUseCase) *ProjectApplicationHandler {
 	return &ProjectApplicationHandler{
-		applicationUseCase: applicationUseCase,
+		useCase: useCase,
 	}
 }
 
 func (h *ProjectApplicationHandler) Create(c *fiber.Ctx) error {
-	var input usecase.CreateProjectApplicationInput
+	var input struct {
+		ProjectID string `json:"project_id"`
+		Message   string `json:"message"`
+	}
+
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(NewErrorResponse("erro ao processar dados"))
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Dados inválidos",
+		})
 	}
 
-	application, err := h.applicationUseCase.Create(c.Context(), input)
+	// Obtém o ID do usuário do contexto (definido pelo middleware de autenticação)
+	userID := c.Locals("userID").(string)
+
+	application, err := h.useCase.Create(c.Context(), usecase.CreateProjectApplicationInput{
+		ProjectID: input.ProjectID,
+		UserID:    userID,
+		Message:   input.Message,
+	})
+
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(NewErrorResponse(err.Error()))
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(NewSuccessResponse(application))
-}
-
-func (h *ProjectApplicationHandler) GetByID(c *fiber.Ctx) error {
-	id := c.Params("id")
-	application, err := h.applicationUseCase.GetByID(c.Context(), id)
-	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(NewErrorResponse(err.Error()))
-	}
-
-	return c.JSON(NewSuccessResponse(application))
+	return c.Status(fiber.StatusCreated).JSON(application)
 }
 
 func (h *ProjectApplicationHandler) ListByProject(c *fiber.Ctx) error {
 	projectID := c.Params("projectId")
-	applications, err := h.applicationUseCase.ListByProject(c.Context(), projectID)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(NewErrorResponse(err.Error()))
+	if projectID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "ID do projeto não fornecido",
+		})
 	}
 
-	return c.JSON(NewSuccessResponse(applications))
+	applications, err := h.useCase.ListByProject(c.Context(), projectID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(applications)
 }
 
 func (h *ProjectApplicationHandler) ListByUser(c *fiber.Ctx) error {
 	userID := c.Params("userId")
-	applications, err := h.applicationUseCase.ListByUser(c.Context(), userID)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(NewErrorResponse(err.Error()))
+	if userID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "ID do usuário não fornecido",
+		})
 	}
 
-	return c.JSON(NewSuccessResponse(applications))
+	applications, err := h.useCase.ListByUser(c.Context(), userID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(applications)
 }
 
 func (h *ProjectApplicationHandler) UpdateStatus(c *fiber.Ctx) error {
-	var input usecase.UpdateApplicationStatusInput
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "ID da candidatura não fornecido",
+		})
+	}
+
+	var input struct {
+		Status string `json:"status"`
+	}
+
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(NewErrorResponse("erro ao processar dados"))
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Dados inválidos",
+		})
 	}
 
-	input.ID = c.Params("id")
-	if err := h.applicationUseCase.UpdateStatus(c.Context(), input); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(NewErrorResponse(err.Error()))
+	err := h.useCase.UpdateStatus(c.Context(), usecase.UpdateApplicationStatusInput{
+		ID:     id,
+		Status: repository.ApplicationStatus(input.Status),
+	})
+
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(NewSuccessResponse(nil))
+	return c.SendStatus(fiber.StatusOK)
 }

@@ -64,7 +64,7 @@ func main() {
 	// Initialize handlers
 	handlers := handler.NewHandler(
 		handler.NewUserHandler(userUseCase),
-		handler.NewProjectHandler(projectUseCase),
+		handler.NewProjectHandler(projectUseCase, projectApplicationUseCase),
 		handler.NewProjectApplicationHandler(projectApplicationUseCase),
 		handler.NewTaskHandler(taskUseCase),
 	)

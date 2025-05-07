@@ -1,17 +1,21 @@
 package handler
 
 import (
+	"github.com/LuisMarchio03/golang-plataforma-mobile-uf/internal/repository"
 	usecase "github.com/LuisMarchio03/golang-plataforma-mobile-uf/internal/usecase/project"
+	projectApplicationUseCase "github.com/LuisMarchio03/golang-plataforma-mobile-uf/internal/usecase/project_application"
 	"github.com/gofiber/fiber/v2"
 )
 
 type ProjectHandler struct {
-	projectUseCase usecase.ProjectUseCase
+	projectUseCase            usecase.ProjectUseCase
+	projectApplicationUseCase projectApplicationUseCase.ProjectApplicationUseCase
 }
 
-func NewProjectHandler(projectUseCase usecase.ProjectUseCase) *ProjectHandler {
+func NewProjectHandler(projectUseCase usecase.ProjectUseCase, projectApplicationUseCase projectApplicationUseCase.ProjectApplicationUseCase) *ProjectHandler {
 	return &ProjectHandler{
-		projectUseCase: projectUseCase,
+		projectUseCase:            projectUseCase,
+		projectApplicationUseCase: projectApplicationUseCase,
 	}
 }
 
@@ -90,4 +94,33 @@ func (h *ProjectHandler) UpdateStatus(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(NewSuccessResponse(nil))
+}
+
+func (h *ProjectHandler) ListEnrolled(c *fiber.Ctx) error {
+	// Get current user ID from context (set by auth middleware)
+	userID := c.Locals("userID").(string)
+
+	// Get all applications for this user
+	applications, err := h.projectApplicationUseCase.ListByUser(c.Context(), userID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch user applications",
+		})
+	}
+
+	// Get all projects where user has an approved application
+	var enrolledProjects []*repository.Project // Changed to slice of pointers
+	for _, app := range applications {
+		if app.Status == "approved" || app.Status == "pending" {
+			project, err := h.projectUseCase.GetByID(c.Context(), app.ProjectID)
+			if err != nil {
+				continue // Skip if project not found
+			}
+			enrolledProjects = append(enrolledProjects, project) // Now this works because types match
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"projects": enrolledProjects,
+	})
 }

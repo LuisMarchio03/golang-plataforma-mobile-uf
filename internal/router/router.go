@@ -29,6 +29,7 @@ func SetupRoutes(app *fiber.App, handlers *handler.Handler) {
 	projects := protected.Group("/projects")
 	projects.Post("/", handlers.Project.Create)
 	projects.Get("/", handlers.Project.List)
+	projects.Get("/enrolled", handlers.Project.ListEnrolled) // Add this new route
 	projects.Get("/:id", handlers.Project.GetByID)
 	projects.Put("/:id", handlers.Project.Update)
 	projects.Put("/:id/status", handlers.Project.UpdateStatus)
